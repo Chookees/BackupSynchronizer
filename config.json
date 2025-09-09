@@ -1,0 +1,38 @@
+{
+  "SourcePath": "",
+  "TargetPath": "",
+  "Mode": "simple",
+  "SyncMode": "OneWay",
+  "LogLevel": "info",
+  "IncludePatterns": [],
+  "ExcludePatterns": [
+    "*.tmp",
+    "*.log",
+    "node_modules",
+    ".git",
+    ".vs",
+    "bin",
+    "obj"
+  ],
+  "PreserveFolderStructure": true,
+  "OverwriteExisting": true,
+  "CreateLogFile": true,
+  "LogFilePath": "backup.log",
+  "EnableDeletionSync": false,
+  "DryRun": false,
+  "UseHashComparison": true,
+  "CreateConflictBackups": true,
+  "ConflictBackupDirectory": "conflicts",
+  "EnableHistoryTracking": true,
+  "HistoryRetentionDays": 30,
+  "HistoryDirectory": ".history",
+  "AutoCleanup": true,
+  "DatabasePath": "file_history.db",
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  }
+}
