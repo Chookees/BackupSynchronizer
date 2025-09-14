@@ -33,6 +33,17 @@
   "CompressionLevel": "Optimal",
   "ExtractArchive": false,
   "ListArchive": false,
+  "ScheduleType": "",
+  "ScheduleName": "",
+  "CronExpression": "",
+  "CreateSchedule": false,
+  "DeleteSchedule": false,
+  "ListSchedules": false,
+  "ExecuteSchedule": false,
+  "GenerateTaskScheduler": false,
+  "GenerateCron": false,
+  "DeleteSourceAfterArchive": false,
+  "CreateTimestampedArchives": true,
   "Logging": {
     "LogLevel": {
       "Default": "Information",

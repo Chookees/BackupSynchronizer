@@ -30,6 +30,15 @@ class Program
             var historyService = serviceProvider.GetRequiredService<IFileHistoryService>();
             await historyService.InitializeDatabaseAsync();
 
+            // Handle schedule operations
+            if (options.CreateSchedule || options.DeleteSchedule || options.ListSchedules || options.ExecuteSchedule || 
+                options.GenerateTaskScheduler || options.GenerateCron)
+            {
+                var scheduleService = serviceProvider.GetRequiredService<IScheduleService>();
+                await HandleScheduleOperationsAsync(scheduleService, options);
+                return 0;
+            }
+
             // Handle archive operations
             if (!string.IsNullOrEmpty(options.ArchivePath) || options.ExtractArchive || options.ListArchive)
             {
@@ -111,6 +120,7 @@ class Program
         services.AddSingleton<IFileHistoryService, FileHistoryService>();
         services.AddSingleton<IRestoreService, RestoreService>();
         services.AddSingleton<IArchiveService, ArchiveService>();
+        services.AddSingleton<IScheduleService, ScheduleService>();
         
         // Add Entity Framework
         services.AddDbContext<Data.FileHistoryContext>(options =>
@@ -208,6 +218,42 @@ class Program
                     break;
                 case "--list-archive":
                     options.ListArchive = true;
+                    break;
+                case "--schedule":
+                    if (i + 1 < args.Length)
+                        options.ScheduleType = args[++i];
+                    break;
+                case "--schedule-name":
+                    if (i + 1 < args.Length)
+                        options.ScheduleName = args[++i];
+                    break;
+                case "--create-schedule":
+                    options.CreateSchedule = true;
+                    break;
+                case "--delete-schedule":
+                    options.DeleteSchedule = true;
+                    break;
+                case "--list-schedules":
+                    options.ListSchedules = true;
+                    break;
+                case "--execute-schedule":
+                    options.ExecuteSchedule = true;
+                    break;
+                case "--generate-task-scheduler":
+                    options.GenerateTaskScheduler = true;
+                    break;
+                case "--generate-cron":
+                    options.GenerateCron = true;
+                    break;
+                case "--cron-expression":
+                    if (i + 1 < args.Length)
+                        options.CronExpression = args[++i];
+                    break;
+                case "--delete-source-after-archive":
+                    options.DeleteSourceAfterArchive = true;
+                    break;
+                case "--no-timestamped-archives":
+                    options.CreateTimestampedArchives = false;
                     break;
                 case "--help":
                 case "-h":
@@ -459,6 +505,228 @@ class Program
         }
     }
     
+    private static async Task HandleScheduleOperationsAsync(IScheduleService scheduleService, SyncOptions options)
+    {
+        if (options.ListSchedules)
+        {
+            Console.WriteLine("Listing all scheduled operations...");
+            var schedules = await scheduleService.LoadSchedulesAsync("schedules.json");
+            
+            if (schedules.Count == 0)
+            {
+                Console.WriteLine("No schedules found.");
+                return;
+            }
+
+            Console.WriteLine($"Found {schedules.Count} schedules:");
+            foreach (var schedule in schedules)
+            {
+                Console.WriteLine($"  Name: {schedule.ScheduleName}");
+                Console.WriteLine($"    Type: {schedule.ScheduleType}");
+                Console.WriteLine($"    Source: {schedule.SourcePath}");
+                Console.WriteLine($"    Target: {schedule.ArchivePath}");
+                Console.WriteLine($"    Enabled: {schedule.Enabled}");
+                Console.WriteLine($"    Next Run: {schedule.NextRun?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Not scheduled"}");
+                Console.WriteLine($"    Last Run: {schedule.LastRun?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Never"}");
+                Console.WriteLine();
+            }
+            return;
+        }
+
+        if (options.DeleteSchedule)
+        {
+            if (string.IsNullOrEmpty(options.ScheduleName))
+            {
+                Console.WriteLine("Error: Schedule name is required for deletion.");
+                return;
+            }
+
+            Console.WriteLine($"Deleting schedule: {options.ScheduleName}");
+            var success = await scheduleService.DeleteScheduleAsync(options.ScheduleName);
+            
+            if (success)
+            {
+                Console.WriteLine("✓ Schedule deleted successfully.");
+            }
+            else
+            {
+                Console.WriteLine("✗ Failed to delete schedule or schedule not found.");
+            }
+            return;
+        }
+
+        if (options.ExecuteSchedule)
+        {
+            if (string.IsNullOrEmpty(options.ScheduleName))
+            {
+                Console.WriteLine("Error: Schedule name is required for execution.");
+                return;
+            }
+
+            Console.WriteLine($"Executing schedule: {options.ScheduleName}");
+            var schedule = await scheduleService.GetScheduleAsync(options.ScheduleName);
+            
+            if (schedule == null)
+            {
+                Console.WriteLine("✗ Schedule not found.");
+                return;
+            }
+
+            ScheduleResult result;
+            if (string.IsNullOrEmpty(options.ArchivePath))
+            {
+                // Execute as archive
+                result = await scheduleService.ExecuteScheduledArchiveAsync(schedule);
+            }
+            else
+            {
+                // Execute as backup/sync based on mode
+                if (options.SyncMode == SyncMode.OneWay)
+                {
+                    result = await scheduleService.ExecuteScheduledBackupAsync(schedule);
+                }
+                else
+                {
+                    result = await scheduleService.ExecuteScheduledSyncAsync(schedule);
+                }
+            }
+
+            if (result.Success)
+            {
+                Console.WriteLine($"✓ Schedule executed successfully!");
+                Console.WriteLine($"  Duration: {result.Duration}");
+                Console.WriteLine($"  Files processed: {result.FilesArchived}");
+                if (!string.IsNullOrEmpty(result.ArchivePath))
+                {
+                    Console.WriteLine($"  Archive: {result.ArchivePath}");
+                }
+                Console.WriteLine($"  Next run: {result.NextRun?.ToString("yyyy-MM-dd HH:mm:ss")}");
+            }
+            else
+            {
+                Console.WriteLine("✗ Schedule execution failed.");
+                foreach (var error in result.Errors)
+                {
+                    Console.WriteLine($"  Error: {error}");
+                }
+            }
+            return;
+        }
+
+        if (options.GenerateTaskScheduler)
+        {
+            if (string.IsNullOrEmpty(options.ScheduleName))
+            {
+                Console.WriteLine("Error: Schedule name is required for Task Scheduler generation.");
+                return;
+            }
+
+            var schedule = await scheduleService.GetScheduleAsync(options.ScheduleName);
+            if (schedule == null)
+            {
+                Console.WriteLine("✗ Schedule not found.");
+                return;
+            }
+
+            var executablePath = Environment.ProcessPath ?? "BackupSynchronizer.exe";
+            var xml = await scheduleService.GenerateWindowsTaskSchedulerXmlAsync(schedule, executablePath);
+            
+            var fileName = $"task_scheduler_{schedule.ScheduleName}.xml";
+            await File.WriteAllTextAsync(fileName, xml);
+            
+            Console.WriteLine($"✓ Windows Task Scheduler XML generated: {fileName}");
+            Console.WriteLine($"  Import this file into Windows Task Scheduler to set up automatic execution.");
+            return;
+        }
+
+        if (options.GenerateCron)
+        {
+            if (string.IsNullOrEmpty(options.ScheduleName))
+            {
+                Console.WriteLine("Error: Schedule name is required for cron generation.");
+                return;
+            }
+
+            var schedule = await scheduleService.GetScheduleAsync(options.ScheduleName);
+            if (schedule == null)
+            {
+                Console.WriteLine("✗ Schedule not found.");
+                return;
+            }
+
+            var cronExpression = await scheduleService.GenerateCronExpressionAsync(schedule);
+            
+            Console.WriteLine($"✓ Cron expression generated for {schedule.ScheduleName}:");
+            Console.WriteLine($"  {cronExpression}");
+            Console.WriteLine($"  Add this to your crontab to set up automatic execution.");
+            return;
+        }
+
+        if (options.CreateSchedule)
+        {
+            if (string.IsNullOrEmpty(options.ScheduleName))
+            {
+                Console.WriteLine("Error: Schedule name is required.");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(options.SourcePath))
+            {
+                Console.WriteLine("Error: Source path is required.");
+                return;
+            }
+
+            var targetPath = !string.IsNullOrEmpty(options.ArchivePath) ? options.ArchivePath : options.TargetPath;
+            if (string.IsNullOrEmpty(targetPath))
+            {
+                Console.WriteLine("Error: Target/Archive path is required.");
+                return;
+            }
+
+            Console.WriteLine($"Creating schedule: {options.ScheduleName}");
+            var schedule = await scheduleService.CreateScheduleAsync(
+                options.ScheduleName, 
+                options.ScheduleType, 
+                options.SourcePath, 
+                targetPath);
+
+            // Set additional options
+            schedule.CompressionLevel = options.CompressionLevel;
+            schedule.SplitSizeBytes = options.SplitSizeBytes;
+            schedule.DeleteSourceAfterArchive = options.DeleteSourceAfterArchive;
+            schedule.CreateTimestampedArchives = options.CreateTimestampedArchives;
+            schedule.IncludePatterns = options.IncludePatterns;
+            schedule.ExcludePatterns = options.ExcludePatterns;
+
+            if (!string.IsNullOrEmpty(options.CronExpression))
+            {
+                schedule.CronExpression = options.CronExpression;
+            }
+
+            // Validate schedule
+            var isValid = await scheduleService.ValidateScheduleAsync(schedule);
+            if (!isValid)
+            {
+                Console.WriteLine("✗ Schedule validation failed.");
+                return;
+            }
+
+            // Save schedule
+            var schedules = await scheduleService.LoadSchedulesAsync("schedules.json");
+            schedules.Add(schedule);
+            await scheduleService.SaveSchedulesAsync(schedules, "schedules.json");
+
+            Console.WriteLine($"✓ Schedule created successfully!");
+            Console.WriteLine($"  Name: {schedule.ScheduleName}");
+            Console.WriteLine($"  Type: {schedule.ScheduleType}");
+            Console.WriteLine($"  Source: {schedule.SourcePath}");
+            Console.WriteLine($"  Target: {schedule.ArchivePath}");
+            Console.WriteLine($"  Next Run: {schedule.NextRun?.ToString("yyyy-MM-dd HH:mm:ss")}");
+            Console.WriteLine();
+            Console.WriteLine("Use --generate-task-scheduler or --generate-cron to create OS scheduler integration.");
+        }
+    }
+    
     private static string FormatBytes(long bytes)
     {
         string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
@@ -502,6 +770,19 @@ class Program
         Console.WriteLine("  --extract               Extract archive to target directory");
         Console.WriteLine("  --list-archive          List contents of an archive");
         Console.WriteLine();
+        Console.WriteLine("Schedule Options:");
+        Console.WriteLine("  --schedule <type>       Schedule type (daily, weekly, monthly, custom)");
+        Console.WriteLine("  --schedule-name <name>  Name for the schedule");
+        Console.WriteLine("  --create-schedule       Create a new scheduled operation");
+        Console.WriteLine("  --delete-schedule       Delete an existing schedule");
+        Console.WriteLine("  --list-schedules        List all scheduled operations");
+        Console.WriteLine("  --execute-schedule      Execute a scheduled operation");
+        Console.WriteLine("  --generate-task-scheduler Generate Windows Task Scheduler XML");
+        Console.WriteLine("  --generate-cron         Generate cron expression for Linux/macOS");
+        Console.WriteLine("  --cron-expression <expr> Custom cron expression for advanced scheduling");
+        Console.WriteLine("  --delete-source-after-archive Delete source after successful archive");
+        Console.WriteLine("  --no-timestamped-archives Don't add timestamps to archive names");
+        Console.WriteLine();
         Console.WriteLine("  -h, --help              Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");
@@ -537,6 +818,24 @@ class Program
         Console.WriteLine();
         Console.WriteLine("  # List archive contents");
         Console.WriteLine("  BackupSynchronizer --source archive.zip --list-archive");
+        Console.WriteLine();
+        Console.WriteLine("  # Create daily schedule");
+        Console.WriteLine("  BackupSynchronizer --schedule daily --schedule-name \"Daily Backup\" --source C:\\MyFiles --target D:\\Backup --create-schedule");
+        Console.WriteLine();
+        Console.WriteLine("  # Create weekly archive schedule");
+        Console.WriteLine("  BackupSynchronizer --schedule weekly --schedule-name \"Weekly Archive\" --source C:\\Data --archive C:\\Backup\\weekly.zip --create-schedule");
+        Console.WriteLine();
+        Console.WriteLine("  # List all schedules");
+        Console.WriteLine("  BackupSynchronizer --list-schedules");
+        Console.WriteLine();
+        Console.WriteLine("  # Execute a schedule manually");
+        Console.WriteLine("  BackupSynchronizer --schedule-name \"Daily Backup\" --execute-schedule");
+        Console.WriteLine();
+        Console.WriteLine("  # Generate Windows Task Scheduler XML");
+        Console.WriteLine("  BackupSynchronizer --schedule-name \"Daily Backup\" --generate-task-scheduler");
+        Console.WriteLine();
+        Console.WriteLine("  # Generate cron expression");
+        Console.WriteLine("  BackupSynchronizer --schedule-name \"Daily Backup\" --generate-cron");
         Console.WriteLine();
         Console.WriteLine("Configuration:");
         Console.WriteLine("  Create a config.json file to set default values.");

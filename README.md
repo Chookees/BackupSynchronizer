@@ -24,6 +24,8 @@ A comprehensive backup and synchronization tool for .NET 8 that provides both on
 - **ZIP Archiving**: Create compressed archives with folder structure preservation
 - **Split Archives**: Create multi-part archives for large datasets
 - **Archive Extraction**: Extract and list archive contents
+- **Scheduled Operations**: Automatically create archives, backups, and syncs on schedule
+- **OS Scheduler Integration**: Generate Windows Task Scheduler XML and cron expressions
 
 ## Installation
 
@@ -68,6 +70,17 @@ BackupSynchronizer --source "C:\FolderA" --target "C:\FolderB" --mode sync --dry
 - `--compression-level <level>`: Compression level (NoCompression, Fastest, Optimal, SmallestSize)
 - `--extract`: Extract archive to target directory
 - `--list-archive`: List contents of an archive
+- `--schedule <type>`: Schedule type (daily, weekly, monthly, custom)
+- `--schedule-name <name>`: Name for the schedule
+- `--create-schedule`: Create a new scheduled operation
+- `--delete-schedule`: Delete an existing schedule
+- `--list-schedules`: List all scheduled operations
+- `--execute-schedule`: Execute a scheduled operation
+- `--generate-task-scheduler`: Generate Windows Task Scheduler XML
+- `--generate-cron`: Generate cron expression for Linux/macOS
+- `--cron-expression <expr>`: Custom cron expression for advanced scheduling
+- `--delete-source-after-archive`: Delete source after successful archive
+- `--no-timestamped-archives`: Don't add timestamps to archive names
 - `-h, --help`: Show help message
 
 ### Configuration File
@@ -187,7 +200,37 @@ BackupSynchronizer --source archive.zip --target C:\Extracted --extract
 BackupSynchronizer --source archive.zip --list-archive
 ```
 
-### Example 13: Using Configuration File
+### Example 13: Create Daily Schedule
+```bash
+BackupSynchronizer --schedule daily --schedule-name "Daily Backup" --source C:\MyFiles --target D:\Backup --create-schedule
+```
+
+### Example 14: Create Weekly Archive Schedule
+```bash
+BackupSynchronizer --schedule weekly --schedule-name "Weekly Archive" --source C:\Data --archive C:\Backup\weekly.zip --create-schedule
+```
+
+### Example 15: List All Schedules
+```bash
+BackupSynchronizer --list-schedules
+```
+
+### Example 16: Execute Schedule Manually
+```bash
+BackupSynchronizer --schedule-name "Daily Backup" --execute-schedule
+```
+
+### Example 17: Generate Windows Task Scheduler XML
+```bash
+BackupSynchronizer --schedule-name "Daily Backup" --generate-task-scheduler
+```
+
+### Example 18: Generate Cron Expression
+```bash
+BackupSynchronizer --schedule-name "Daily Backup" --generate-cron
+```
+
+### Example 19: Using Configuration File
 ```bash
 # Create config.json with your settings, then run:
 BackupSynchronizer
@@ -298,6 +341,53 @@ For large datasets, archives can be split into multiple parts:
 - **Error Handling**: Graceful handling of file access issues
 - **Logging**: Detailed logging of archive operations
 - **Size Reporting**: Original vs compressed size with compression ratios
+
+## Scheduled Operations
+
+### Schedule Types
+The tool supports multiple schedule types for automated operations:
+
+- **Daily**: Execute every day at a specified time (default: 2:00 AM)
+- **Weekly**: Execute on a specific day of the week
+- **Monthly**: Execute on a specific day of the month
+- **Custom**: Use custom cron expressions for advanced scheduling
+
+### Schedule Management
+- **Create Schedules**: Define automated backup, sync, or archive operations
+- **List Schedules**: View all configured schedules with next run times
+- **Execute Schedules**: Run schedules manually for testing
+- **Delete Schedules**: Remove unwanted scheduled operations
+- **Schedule History**: Track execution results and performance
+
+### OS Scheduler Integration
+The tool generates integration files for operating system schedulers:
+
+- **Windows Task Scheduler**: Generate XML files for automatic import
+- **Linux/macOS Cron**: Generate cron expressions for crontab
+- **Cross-Platform**: Works on Windows, Linux, and macOS
+
+### Schedule Features
+- **Timestamped Archives**: Automatic timestamping of archive files
+- **Source Cleanup**: Optional deletion of source files after archiving
+- **Error Handling**: Robust error handling with retry mechanisms
+- **Logging**: Detailed logging of all scheduled operations
+- **Validation**: Comprehensive validation of schedule configurations
+
+### Schedule Configuration
+Schedules are stored in `schedules.json` with the following structure:
+```json
+{
+  "scheduleName": "Daily Backup",
+  "scheduleType": "daily",
+  "sourcePath": "C:\\MyFiles",
+  "archivePath": "C:\\Backup\\daily.zip",
+  "enabled": true,
+  "nextRun": "2025-09-15T02:00:00",
+  "compressionLevel": "Optimal",
+  "includePatterns": [],
+  "excludePatterns": ["*.tmp", "*.log"]
+}
+```
 
 ## Building from Source
 

@@ -27,6 +27,19 @@ public class SyncOptions : BackupOptions
     public string CompressionLevel { get; set; } = "Optimal";
     public bool ExtractArchive { get; set; } = false;
     public bool ListArchive { get; set; } = false;
+    
+    // Schedule options
+    public string ScheduleType { get; set; } = string.Empty; // daily, weekly, monthly, custom
+    public string ScheduleName { get; set; } = string.Empty;
+    public string CronExpression { get; set; } = string.Empty;
+    public bool CreateSchedule { get; set; } = false;
+    public bool DeleteSchedule { get; set; } = false;
+    public bool ListSchedules { get; set; } = false;
+    public bool ExecuteSchedule { get; set; } = false;
+    public bool GenerateTaskScheduler { get; set; } = false;
+    public bool GenerateCron { get; set; } = false;
+    public bool DeleteSourceAfterArchive { get; set; } = false;
+    public bool CreateTimestampedArchives { get; set; } = true;
 }
 
 public enum SyncMode
