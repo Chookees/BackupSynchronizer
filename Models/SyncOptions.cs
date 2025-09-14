@@ -20,6 +20,13 @@ public class SyncOptions : BackupOptions
     public bool ListDeleted { get; set; } = false;
     public string ListHistoryPath { get; set; } = string.Empty;
     public bool CleanupHistory { get; set; } = false;
+    
+    // Archive options
+    public string ArchivePath { get; set; } = string.Empty;
+    public long? SplitSizeBytes { get; set; } = null;
+    public string CompressionLevel { get; set; } = "Optimal";
+    public bool ExtractArchive { get; set; } = false;
+    public bool ListArchive { get; set; } = false;
 }
 
 public enum SyncMode

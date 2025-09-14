@@ -30,6 +30,14 @@ class Program
             var historyService = serviceProvider.GetRequiredService<IFileHistoryService>();
             await historyService.InitializeDatabaseAsync();
 
+            // Handle archive operations
+            if (!string.IsNullOrEmpty(options.ArchivePath) || options.ExtractArchive || options.ListArchive)
+            {
+                var archiveService = serviceProvider.GetRequiredService<IArchiveService>();
+                await HandleArchiveOperationsAsync(archiveService, options);
+                return 0;
+            }
+
             // Handle restore operations
             if (!string.IsNullOrEmpty(options.RestoreFilePath) || options.ListDeleted || !string.IsNullOrEmpty(options.ListHistoryPath) || options.CleanupHistory)
             {
@@ -102,6 +110,7 @@ class Program
         services.AddSingleton<IFileComparisonService, FileComparisonService>();
         services.AddSingleton<IFileHistoryService, FileHistoryService>();
         services.AddSingleton<IRestoreService, RestoreService>();
+        services.AddSingleton<IArchiveService, ArchiveService>();
         
         // Add Entity Framework
         services.AddDbContext<Data.FileHistoryContext>(options =>
@@ -178,6 +187,28 @@ class Program
                 case "--cleanup-history":
                     options.CleanupHistory = true;
                     break;
+                case "--archive":
+                    if (i + 1 < args.Length)
+                        options.ArchivePath = args[++i];
+                    break;
+                case "--split-size":
+                    if (i + 1 < args.Length)
+                    {
+                        var sizeStr = args[++i];
+                        if (TryParseSize(sizeStr, out var size))
+                            options.SplitSizeBytes = size;
+                    }
+                    break;
+                case "--compression-level":
+                    if (i + 1 < args.Length)
+                        options.CompressionLevel = args[++i];
+                    break;
+                case "--extract":
+                    options.ExtractArchive = true;
+                    break;
+                case "--list-archive":
+                    options.ListArchive = true;
+                    break;
                 case "--help":
                 case "-h":
                     ShowHelp();
@@ -187,6 +218,47 @@ class Program
         }
         
         return options;
+    }
+    
+    private static bool TryParseSize(string sizeStr, out long size)
+    {
+        size = 0;
+        
+        if (string.IsNullOrEmpty(sizeStr))
+            return false;
+            
+        sizeStr = sizeStr.Trim().ToUpper();
+        
+        try
+        {
+            if (sizeStr.EndsWith("KB"))
+            {
+                var value = long.Parse(sizeStr[..^2]);
+                size = value * 1024;
+                return true;
+            }
+            else if (sizeStr.EndsWith("MB"))
+            {
+                var value = long.Parse(sizeStr[..^2]);
+                size = value * 1024 * 1024;
+                return true;
+            }
+            else if (sizeStr.EndsWith("GB"))
+            {
+                var value = long.Parse(sizeStr[..^2]);
+                size = value * 1024 * 1024 * 1024;
+                return true;
+            }
+            else
+            {
+                size = long.Parse(sizeStr);
+                return true;
+            }
+        }
+        catch
+        {
+            return false;
+        }
     }
     
     private static async Task HandleRestoreOperationsAsync(IRestoreService restoreService, SyncOptions options, IServiceProvider serviceProvider)
@@ -268,6 +340,138 @@ class Program
         }
     }
     
+    private static async Task HandleArchiveOperationsAsync(IArchiveService archiveService, SyncOptions options)
+    {
+        if (options.ExtractArchive)
+        {
+            if (string.IsNullOrEmpty(options.SourcePath))
+            {
+                Console.WriteLine("Error: Source path is required for extraction.");
+                return;
+            }
+            
+            Console.WriteLine($"Extracting archive: {options.SourcePath} -> {options.TargetPath}");
+            var success = await archiveService.ExtractArchiveAsync(options.SourcePath, options.TargetPath);
+            
+            if (success)
+            {
+                Console.WriteLine("✓ Archive extracted successfully.");
+            }
+            else
+            {
+                Console.WriteLine("✗ Failed to extract archive.");
+            }
+            return;
+        }
+
+        if (options.ListArchive)
+        {
+            if (string.IsNullOrEmpty(options.SourcePath))
+            {
+                Console.WriteLine("Error: Archive path is required for listing.");
+                return;
+            }
+            
+            Console.WriteLine($"Listing archive contents: {options.SourcePath}");
+            var contents = await archiveService.ListArchiveContentsAsync(options.SourcePath);
+            
+            if (contents.Count == 0)
+            {
+                Console.WriteLine("Archive is empty or could not be read.");
+                return;
+            }
+
+            Console.WriteLine($"Found {contents.Count} entries:");
+            foreach (var entry in contents.Take(50)) // Show first 50 entries
+            {
+                Console.WriteLine($"  {entry}");
+            }
+            
+            if (contents.Count > 50)
+            {
+                Console.WriteLine($"  ... and {contents.Count - 50} more entries");
+            }
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(options.ArchivePath))
+        {
+            if (string.IsNullOrEmpty(options.SourcePath))
+            {
+                Console.WriteLine("Error: Source path is required for archiving.");
+                return;
+            }
+
+            Console.WriteLine($"Creating archive: {options.SourcePath} -> {options.ArchivePath}");
+            
+            var archiveOptions = new ArchiveOptions
+            {
+                SourcePath = options.SourcePath,
+                OutputPath = options.ArchivePath,
+                SplitSizeBytes = options.SplitSizeBytes,
+                CompressionLevel = Enum.Parse<Models.CompressionLevel>(options.CompressionLevel),
+                IncludePatterns = options.IncludePatterns,
+                ExcludePatterns = options.ExcludePatterns,
+                CreateLogFile = options.CreateLogFile,
+                LogFilePath = options.LogFilePath
+            };
+
+            try
+            {
+                var result = await archiveService.CreateArchiveAsync(archiveOptions);
+                
+                if (result.Success)
+                {
+                    Console.WriteLine($"✓ Archive created successfully!");
+                    Console.WriteLine($"  Files archived: {result.FilesArchived}");
+                    Console.WriteLine($"  Directories archived: {result.DirectoriesArchived}");
+                    Console.WriteLine($"  Original size: {FormatBytes(result.OriginalSizeBytes)}");
+                    Console.WriteLine($"  Compressed size: {FormatBytes(result.CompressedSizeBytes)}");
+                    Console.WriteLine($"  Compression ratio: {result.CompressionRatio:F1}%");
+                    Console.WriteLine($"  Duration: {result.Duration}");
+                    
+                    if (result.CreatedArchives.Count > 1)
+                    {
+                        Console.WriteLine($"  Created {result.CreatedArchives.Count} split archives:");
+                        foreach (var archive in result.CreatedArchives)
+                        {
+                            Console.WriteLine($"    {archive}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"  Archive: {result.ArchivePath}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("✗ Archive creation failed.");
+                    foreach (var error in result.Errors)
+                    {
+                        Console.WriteLine($"  Error: {error}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✗ Archive creation failed: {ex.Message}");
+            }
+        }
+    }
+    
+    private static string FormatBytes(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        int counter = 0;
+        decimal number = bytes;
+        while (Math.Round(number / 1024) >= 1)
+        {
+            number /= 1024;
+            counter++;
+        }
+        return $"{number:n1} {suffixes[counter]}";
+    }
+    
     private static void ShowHelp()
     {
         Console.WriteLine("Backup Synchronizer - A backup and sync tool for .NET 8");
@@ -290,6 +494,13 @@ class Program
         Console.WriteLine("  --list-history <path>   List history for a specific file");
         Console.WriteLine("  --history-keep-days <n> Set history retention period (default: 30)");
         Console.WriteLine("  --cleanup-history       Clean up expired history files");
+        Console.WriteLine();
+        Console.WriteLine("Archive Options:");
+        Console.WriteLine("  --archive <output>      Create ZIP archive from source directory");
+        Console.WriteLine("  --split-size <size>     Split archive into parts (e.g., 100MB, 1GB)");
+        Console.WriteLine("  --compression-level <level> Compression level (NoCompression, Fastest, Optimal, SmallestSize)");
+        Console.WriteLine("  --extract               Extract archive to target directory");
+        Console.WriteLine("  --list-archive          List contents of an archive");
         Console.WriteLine();
         Console.WriteLine("  -h, --help              Show this help message");
         Console.WriteLine();
@@ -314,6 +525,18 @@ class Program
         Console.WriteLine();
         Console.WriteLine("  # Cleanup old history");
         Console.WriteLine("  BackupSynchronizer --cleanup-history --history-keep-days 7");
+        Console.WriteLine();
+        Console.WriteLine("  # Create ZIP archive");
+        Console.WriteLine("  BackupSynchronizer --source C:\\MyFiles --archive C:\\Backup\\archive.zip");
+        Console.WriteLine();
+        Console.WriteLine("  # Create split archive");
+        Console.WriteLine("  BackupSynchronizer --source C:\\LargeFolder --archive backup.zip --split-size 100MB");
+        Console.WriteLine();
+        Console.WriteLine("  # Extract archive");
+        Console.WriteLine("  BackupSynchronizer --source archive.zip --target C:\\Extracted --extract");
+        Console.WriteLine();
+        Console.WriteLine("  # List archive contents");
+        Console.WriteLine("  BackupSynchronizer --source archive.zip --list-archive");
         Console.WriteLine();
         Console.WriteLine("Configuration:");
         Console.WriteLine("  Create a config.json file to set default values.");

@@ -28,6 +28,11 @@
   "HistoryDirectory": ".history",
   "AutoCleanup": true,
   "DatabasePath": "file_history.db",
+  "ArchivePath": "",
+  "SplitSizeBytes": null,
+  "CompressionLevel": "Optimal",
+  "ExtractArchive": false,
+  "ListArchive": false,
   "Logging": {
     "LogLevel": {
       "Default": "Information",

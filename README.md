@@ -21,6 +21,9 @@ A comprehensive backup and synchronization tool for .NET 8 that provides both on
 - **File History Tracking**: Complete version history with SQLite database
 - **Restore Functionality**: Restore deleted files from history
 - **Automatic Cleanup**: Configurable retention period for history files
+- **ZIP Archiving**: Create compressed archives with folder structure preservation
+- **Split Archives**: Create multi-part archives for large datasets
+- **Archive Extraction**: Extract and list archive contents
 
 ## Installation
 
@@ -60,6 +63,11 @@ BackupSynchronizer --source "C:\FolderA" --target "C:\FolderB" --mode sync --dry
 - `--list-history <path>`: List history for a specific file
 - `--history-keep-days <n>`: Set history retention period (default: 30)
 - `--cleanup-history`: Clean up expired history files
+- `--archive <output>`: Create ZIP archive from source directory
+- `--split-size <size>`: Split archive into parts (e.g., 100MB, 1GB)
+- `--compression-level <level>`: Compression level (NoCompression, Fastest, Optimal, SmallestSize)
+- `--extract`: Extract archive to target directory
+- `--list-archive`: List contents of an archive
 - `-h, --help`: Show help message
 
 ### Configuration File
@@ -96,7 +104,12 @@ Create a `config.json` file in the same directory as the executable:
   "HistoryRetentionDays": 30,
   "HistoryDirectory": ".history",
   "AutoCleanup": true,
-  "DatabasePath": "file_history.db"
+  "DatabasePath": "file_history.db",
+  "ArchivePath": "",
+  "SplitSizeBytes": null,
+  "CompressionLevel": "Optimal",
+  "ExtractArchive": false,
+  "ListArchive": false
 }
 ```
 
@@ -154,7 +167,27 @@ BackupSynchronizer --list-history "C:\MyFiles\document.txt"
 BackupSynchronizer --cleanup-history --history-keep-days 7
 ```
 
-### Example 9: Using Configuration File
+### Example 9: Create ZIP Archive
+```bash
+BackupSynchronizer --source C:\MyFiles --archive C:\Backup\archive.zip
+```
+
+### Example 10: Create Split Archive
+```bash
+BackupSynchronizer --source C:\LargeFolder --archive backup.zip --split-size 100MB
+```
+
+### Example 11: Extract Archive
+```bash
+BackupSynchronizer --source archive.zip --target C:\Extracted --extract
+```
+
+### Example 12: List Archive Contents
+```bash
+BackupSynchronizer --source archive.zip --list-archive
+```
+
+### Example 13: Using Configuration File
 ```bash
 # Create config.json with your settings, then run:
 BackupSynchronizer
@@ -236,6 +269,35 @@ The SQLite database tracks:
 - Timestamp of the change
 - File size and reason for the change
 - Physical location of the history file
+
+## Archiving Features
+
+### ZIP Archive Creation
+The tool can create compressed ZIP archives with comprehensive features:
+
+- **Folder Structure Preservation**: Maintains complete directory hierarchy
+- **File Filtering**: Uses same include/exclude patterns as backup/sync operations
+- **Compression Levels**: NoCompression, Fastest, Optimal, SmallestSize
+- **Progress Tracking**: Real-time progress with file counts and compression ratios
+
+### Split Archives
+For large datasets, archives can be split into multiple parts:
+
+- **Size-Based Splitting**: Specify maximum size per part (KB, MB, GB)
+- **Automatic Naming**: Parts named as `archive.part001.zip`, `archive.part002.zip`, etc.
+- **Transparent Handling**: Each part is a complete, valid ZIP archive
+
+### Archive Operations
+- **Create**: `--archive <output>` creates ZIP from source directory
+- **Extract**: `--extract` extracts archive to target directory
+- **List**: `--list-archive` shows all files and folders in archive
+- **Compression**: `--compression-level` controls compression algorithm
+
+### Archive Features
+- **Metadata Preservation**: File timestamps and attributes maintained
+- **Error Handling**: Graceful handling of file access issues
+- **Logging**: Detailed logging of archive operations
+- **Size Reporting**: Original vs compressed size with compression ratios
 
 ## Building from Source
 
