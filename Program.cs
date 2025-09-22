@@ -30,6 +30,23 @@ class Program
             var historyService = serviceProvider.GetRequiredService<IFileHistoryService>();
             await historyService.InitializeDatabaseAsync();
 
+            // Handle schedule operations
+            if (options.CreateSchedule || options.DeleteSchedule || options.ListSchedules || options.ExecuteSchedule || 
+                options.GenerateTaskScheduler || options.GenerateCron)
+            {
+                var scheduleService = serviceProvider.GetRequiredService<IScheduleService>();
+                await HandleScheduleOperationsAsync(scheduleService, options);
+                return 0;
+            }
+
+            // Handle archive operations
+            if (!string.IsNullOrEmpty(options.ArchivePath) || options.ExtractArchive || options.ListArchive)
+            {
+                var archiveService = serviceProvider.GetRequiredService<IArchiveService>();
+                await HandleArchiveOperationsAsync(archiveService, options);
+                return 0;
+            }
+
             // Handle restore operations
             if (!string.IsNullOrEmpty(options.RestoreFilePath) || options.ListDeleted || !string.IsNullOrEmpty(options.ListHistoryPath) || options.CleanupHistory)
             {
@@ -270,6 +287,47 @@ class Program
         return options;
     }
     
+    private static bool TryParseSize(string sizeStr, out long size)
+    {
+        size = 0;
+        
+        if (string.IsNullOrEmpty(sizeStr))
+            return false;
+            
+        sizeStr = sizeStr.Trim().ToUpper();
+        
+        try
+        {
+            if (sizeStr.EndsWith("KB"))
+            {
+                var value = long.Parse(sizeStr[..^2]);
+                size = value * 1024;
+                return true;
+            }
+            else if (sizeStr.EndsWith("MB"))
+            {
+                var value = long.Parse(sizeStr[..^2]);
+                size = value * 1024 * 1024;
+                return true;
+            }
+            else if (sizeStr.EndsWith("GB"))
+            {
+                var value = long.Parse(sizeStr[..^2]);
+                size = value * 1024 * 1024 * 1024;
+                return true;
+            }
+            else
+            {
+                size = long.Parse(sizeStr);
+                return true;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+    
     private static async Task HandleRestoreOperationsAsync(IRestoreService restoreService, SyncOptions options, IServiceProvider serviceProvider)
     {
         if (options.CleanupHistory)
@@ -347,6 +405,360 @@ class Program
                 }
             }
         }
+    }
+    
+    private static async Task HandleArchiveOperationsAsync(IArchiveService archiveService, SyncOptions options)
+    {
+        if (options.ExtractArchive)
+        {
+            if (string.IsNullOrEmpty(options.SourcePath))
+            {
+                Console.WriteLine("Error: Source path is required for extraction.");
+                return;
+            }
+            
+            Console.WriteLine($"Extracting archive: {options.SourcePath} -> {options.TargetPath}");
+            var success = await archiveService.ExtractArchiveAsync(options.SourcePath, options.TargetPath);
+            
+            if (success)
+            {
+                Console.WriteLine("✓ Archive extracted successfully.");
+            }
+            else
+            {
+                Console.WriteLine("✗ Failed to extract archive.");
+            }
+            return;
+        }
+
+        if (options.ListArchive)
+        {
+            if (string.IsNullOrEmpty(options.SourcePath))
+            {
+                Console.WriteLine("Error: Archive path is required for listing.");
+                return;
+            }
+            
+            Console.WriteLine($"Listing archive contents: {options.SourcePath}");
+            var contents = await archiveService.ListArchiveContentsAsync(options.SourcePath);
+            
+            if (contents.Count == 0)
+            {
+                Console.WriteLine("Archive is empty or could not be read.");
+                return;
+            }
+
+            Console.WriteLine($"Found {contents.Count} entries:");
+            foreach (var entry in contents.Take(50)) // Show first 50 entries
+            {
+                Console.WriteLine($"  {entry}");
+            }
+            
+            if (contents.Count > 50)
+            {
+                Console.WriteLine($"  ... and {contents.Count - 50} more entries");
+            }
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(options.ArchivePath))
+        {
+            if (string.IsNullOrEmpty(options.SourcePath))
+            {
+                Console.WriteLine("Error: Source path is required for archiving.");
+                return;
+            }
+
+            Console.WriteLine($"Creating archive: {options.SourcePath} -> {options.ArchivePath}");
+            
+            var archiveOptions = new ArchiveOptions
+            {
+                SourcePath = options.SourcePath,
+                OutputPath = options.ArchivePath,
+                SplitSizeBytes = options.SplitSizeBytes,
+                CompressionLevel = Enum.Parse<Models.CompressionLevel>(options.CompressionLevel),
+                IncludePatterns = options.IncludePatterns,
+                ExcludePatterns = options.ExcludePatterns,
+                CreateLogFile = options.CreateLogFile,
+                LogFilePath = options.LogFilePath
+            };
+
+            try
+            {
+                var result = await archiveService.CreateArchiveAsync(archiveOptions);
+                
+                if (result.Success)
+                {
+                    Console.WriteLine($"✓ Archive created successfully!");
+                    Console.WriteLine($"  Files archived: {result.FilesArchived}");
+                    Console.WriteLine($"  Directories archived: {result.DirectoriesArchived}");
+                    Console.WriteLine($"  Original size: {FormatBytes(result.OriginalSizeBytes)}");
+                    Console.WriteLine($"  Compressed size: {FormatBytes(result.CompressedSizeBytes)}");
+                    Console.WriteLine($"  Compression ratio: {result.CompressionRatio:F1}%");
+                    Console.WriteLine($"  Duration: {result.Duration}");
+                    
+                    if (result.CreatedArchives.Count > 1)
+                    {
+                        Console.WriteLine($"  Created {result.CreatedArchives.Count} split archives:");
+                        foreach (var archive in result.CreatedArchives)
+                        {
+                            Console.WriteLine($"    {archive}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"  Archive: {result.ArchivePath}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("✗ Archive creation failed.");
+                    foreach (var error in result.Errors)
+                    {
+                        Console.WriteLine($"  Error: {error}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✗ Archive creation failed: {ex.Message}");
+            }
+        }
+    }
+    
+    private static async Task HandleScheduleOperationsAsync(IScheduleService scheduleService, SyncOptions options)
+    {
+        if (options.ListSchedules)
+        {
+            Console.WriteLine("Listing all scheduled operations...");
+            var schedules = await scheduleService.LoadSchedulesAsync("schedules.json");
+            
+            if (schedules.Count == 0)
+            {
+                Console.WriteLine("No schedules found.");
+                return;
+            }
+
+            Console.WriteLine($"Found {schedules.Count} schedules:");
+            foreach (var schedule in schedules)
+            {
+                Console.WriteLine($"  Name: {schedule.ScheduleName}");
+                Console.WriteLine($"    Type: {schedule.ScheduleType}");
+                Console.WriteLine($"    Source: {schedule.SourcePath}");
+                Console.WriteLine($"    Target: {schedule.ArchivePath}");
+                Console.WriteLine($"    Enabled: {schedule.Enabled}");
+                Console.WriteLine($"    Next Run: {schedule.NextRun?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Not scheduled"}");
+                Console.WriteLine($"    Last Run: {schedule.LastRun?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Never"}");
+                Console.WriteLine();
+            }
+            return;
+        }
+
+        if (options.DeleteSchedule)
+        {
+            if (string.IsNullOrEmpty(options.ScheduleName))
+            {
+                Console.WriteLine("Error: Schedule name is required for deletion.");
+                return;
+            }
+
+            Console.WriteLine($"Deleting schedule: {options.ScheduleName}");
+            var success = await scheduleService.DeleteScheduleAsync(options.ScheduleName);
+            
+            if (success)
+            {
+                Console.WriteLine("✓ Schedule deleted successfully.");
+            }
+            else
+            {
+                Console.WriteLine("✗ Failed to delete schedule or schedule not found.");
+            }
+            return;
+        }
+
+        if (options.ExecuteSchedule)
+        {
+            if (string.IsNullOrEmpty(options.ScheduleName))
+            {
+                Console.WriteLine("Error: Schedule name is required for execution.");
+                return;
+            }
+
+            Console.WriteLine($"Executing schedule: {options.ScheduleName}");
+            var schedule = await scheduleService.GetScheduleAsync(options.ScheduleName);
+            
+            if (schedule == null)
+            {
+                Console.WriteLine("✗ Schedule not found.");
+                return;
+            }
+
+            ScheduleResult result;
+            if (string.IsNullOrEmpty(options.ArchivePath))
+            {
+                // Execute as archive
+                result = await scheduleService.ExecuteScheduledArchiveAsync(schedule);
+            }
+            else
+            {
+                // Execute as backup/sync based on mode
+                if (options.SyncMode == SyncMode.OneWay)
+                {
+                    result = await scheduleService.ExecuteScheduledBackupAsync(schedule);
+                }
+                else
+                {
+                    result = await scheduleService.ExecuteScheduledSyncAsync(schedule);
+                }
+            }
+
+            if (result.Success)
+            {
+                Console.WriteLine($"✓ Schedule executed successfully!");
+                Console.WriteLine($"  Duration: {result.Duration}");
+                Console.WriteLine($"  Files processed: {result.FilesArchived}");
+                if (!string.IsNullOrEmpty(result.ArchivePath))
+                {
+                    Console.WriteLine($"  Archive: {result.ArchivePath}");
+                }
+                Console.WriteLine($"  Next run: {result.NextRun?.ToString("yyyy-MM-dd HH:mm:ss")}");
+            }
+            else
+            {
+                Console.WriteLine("✗ Schedule execution failed.");
+                foreach (var error in result.Errors)
+                {
+                    Console.WriteLine($"  Error: {error}");
+                }
+            }
+            return;
+        }
+
+        if (options.GenerateTaskScheduler)
+        {
+            if (string.IsNullOrEmpty(options.ScheduleName))
+            {
+                Console.WriteLine("Error: Schedule name is required for Task Scheduler generation.");
+                return;
+            }
+
+            var schedule = await scheduleService.GetScheduleAsync(options.ScheduleName);
+            if (schedule == null)
+            {
+                Console.WriteLine("✗ Schedule not found.");
+                return;
+            }
+
+            var executablePath = Environment.ProcessPath ?? "BackupSynchronizer.exe";
+            var xml = await scheduleService.GenerateWindowsTaskSchedulerXmlAsync(schedule, executablePath);
+            
+            var fileName = $"task_scheduler_{schedule.ScheduleName}.xml";
+            await File.WriteAllTextAsync(fileName, xml);
+            
+            Console.WriteLine($"✓ Windows Task Scheduler XML generated: {fileName}");
+            Console.WriteLine($"  Import this file into Windows Task Scheduler to set up automatic execution.");
+            return;
+        }
+
+        if (options.GenerateCron)
+        {
+            if (string.IsNullOrEmpty(options.ScheduleName))
+            {
+                Console.WriteLine("Error: Schedule name is required for cron generation.");
+                return;
+            }
+
+            var schedule = await scheduleService.GetScheduleAsync(options.ScheduleName);
+            if (schedule == null)
+            {
+                Console.WriteLine("✗ Schedule not found.");
+                return;
+            }
+
+            var cronExpression = await scheduleService.GenerateCronExpressionAsync(schedule);
+            
+            Console.WriteLine($"✓ Cron expression generated for {schedule.ScheduleName}:");
+            Console.WriteLine($"  {cronExpression}");
+            Console.WriteLine($"  Add this to your crontab to set up automatic execution.");
+            return;
+        }
+
+        if (options.CreateSchedule)
+        {
+            if (string.IsNullOrEmpty(options.ScheduleName))
+            {
+                Console.WriteLine("Error: Schedule name is required.");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(options.SourcePath))
+            {
+                Console.WriteLine("Error: Source path is required.");
+                return;
+            }
+
+            var targetPath = !string.IsNullOrEmpty(options.ArchivePath) ? options.ArchivePath : options.TargetPath;
+            if (string.IsNullOrEmpty(targetPath))
+            {
+                Console.WriteLine("Error: Target/Archive path is required.");
+                return;
+            }
+
+            Console.WriteLine($"Creating schedule: {options.ScheduleName}");
+            var schedule = await scheduleService.CreateScheduleAsync(
+                options.ScheduleName, 
+                options.ScheduleType, 
+                options.SourcePath, 
+                targetPath);
+
+            // Set additional options
+            schedule.CompressionLevel = options.CompressionLevel;
+            schedule.SplitSizeBytes = options.SplitSizeBytes;
+            schedule.DeleteSourceAfterArchive = options.DeleteSourceAfterArchive;
+            schedule.CreateTimestampedArchives = options.CreateTimestampedArchives;
+            schedule.IncludePatterns = options.IncludePatterns;
+            schedule.ExcludePatterns = options.ExcludePatterns;
+
+            if (!string.IsNullOrEmpty(options.CronExpression))
+            {
+                schedule.CronExpression = options.CronExpression;
+            }
+
+            // Validate schedule
+            var isValid = await scheduleService.ValidateScheduleAsync(schedule);
+            if (!isValid)
+            {
+                Console.WriteLine("✗ Schedule validation failed.");
+                return;
+            }
+
+            // Save schedule
+            var schedules = await scheduleService.LoadSchedulesAsync("schedules.json");
+            schedules.Add(schedule);
+            await scheduleService.SaveSchedulesAsync(schedules, "schedules.json");
+
+            Console.WriteLine($"✓ Schedule created successfully!");
+            Console.WriteLine($"  Name: {schedule.ScheduleName}");
+            Console.WriteLine($"  Type: {schedule.ScheduleType}");
+            Console.WriteLine($"  Source: {schedule.SourcePath}");
+            Console.WriteLine($"  Target: {schedule.ArchivePath}");
+            Console.WriteLine($"  Next Run: {schedule.NextRun?.ToString("yyyy-MM-dd HH:mm:ss")}");
+            Console.WriteLine();
+            Console.WriteLine("Use --generate-task-scheduler or --generate-cron to create OS scheduler integration.");
+        }
+    }
+    
+    private static string FormatBytes(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        int counter = 0;
+        decimal number = bytes;
+        while (Math.Round(number / 1024) >= 1)
+        {
+            number /= 1024;
+            counter++;
+        }
+        return $"{number:n1} {suffixes[counter]}";
     }
     
     private static void ShowHelp()

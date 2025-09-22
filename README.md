@@ -123,7 +123,12 @@ Create a `config.json` file in the same directory as the executable:
   "HistoryRetentionDays": 30,
   "HistoryDirectory": ".history",
   "AutoCleanup": true,
-  "DatabasePath": "file_history.db"
+  "DatabasePath": "file_history.db",
+  "ArchivePath": "",
+  "SplitSizeBytes": null,
+  "CompressionLevel": "Optimal",
+  "ExtractArchive": false,
+  "ListArchive": false
 }
 ```
 
