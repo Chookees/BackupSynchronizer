@@ -21,6 +21,13 @@ A comprehensive backup and synchronization tool for .NET 8 that provides both on
 - **File History Tracking**: Complete version history with SQLite database
 - **Restore Functionality**: Restore deleted files from history
 - **Automatic Cleanup**: Configurable retention period for history files
+- **ZIP Archiving**: Create compressed archives with folder structure preservation
+- **Split Archives**: Create multi-part archives for large datasets
+- **Archive Extraction**: Extract and list archive contents
+- **Scheduled Operations**: Automatically create archives, backups, and syncs on schedule
+- **OS Scheduler Integration**: Generate Windows Task Scheduler XML and cron expressions
+- **Parallel File Operations**: Multi-threaded file copying for improved performance
+- **Progress Tracking**: Real-time progress display with configurable update intervals
 
 ## Installation
 
@@ -60,6 +67,26 @@ BackupSynchronizer --source "C:\FolderA" --target "C:\FolderB" --mode sync --dry
 - `--list-history <path>`: List history for a specific file
 - `--history-keep-days <n>`: Set history retention period (default: 30)
 - `--cleanup-history`: Clean up expired history files
+- `--archive <output>`: Create ZIP archive from source directory
+- `--split-size <size>`: Split archive into parts (e.g., 100MB, 1GB)
+- `--compression-level <level>`: Compression level (NoCompression, Fastest, Optimal, SmallestSize)
+- `--extract`: Extract archive to target directory
+- `--list-archive`: List contents of an archive
+- `--schedule <type>`: Schedule type (daily, weekly, monthly, custom)
+- `--schedule-name <name>`: Name for the schedule
+- `--create-schedule`: Create a new scheduled operation
+- `--delete-schedule`: Delete an existing schedule
+- `--list-schedules`: List all scheduled operations
+- `--execute-schedule`: Execute a scheduled operation
+- `--generate-task-scheduler`: Generate Windows Task Scheduler XML
+- `--generate-cron`: Generate cron expression for Linux/macOS
+- `--cron-expression <expr>`: Custom cron expression for advanced scheduling
+- `--delete-source-after-archive`: Delete source after successful archive
+- `--no-timestamped-archives`: Don't add timestamps to archive names
+- `--max-threads <n>`: Set maximum number of parallel threads (default: CPU count)
+- `--disable-parallel`: Disable parallel file operations
+- `--no-progress`: Disable progress display
+- `--progress-interval <n>`: Update progress every N files (default: 10)
 - `-h, --help`: Show help message
 
 ### Configuration File
@@ -154,7 +181,72 @@ BackupSynchronizer --list-history "C:\MyFiles\document.txt"
 BackupSynchronizer --cleanup-history --history-keep-days 7
 ```
 
-### Example 9: Using Configuration File
+### Example 9: Create ZIP Archive
+```bash
+BackupSynchronizer --source C:\MyFiles --archive C:\Backup\archive.zip
+```
+
+### Example 10: Create Split Archive
+```bash
+BackupSynchronizer --source C:\LargeFolder --archive backup.zip --split-size 100MB
+```
+
+### Example 11: Extract Archive
+```bash
+BackupSynchronizer --source archive.zip --target C:\Extracted --extract
+```
+
+### Example 12: List Archive Contents
+```bash
+BackupSynchronizer --source archive.zip --list-archive
+```
+
+### Example 13: Create Daily Schedule
+```bash
+BackupSynchronizer --schedule daily --schedule-name "Daily Backup" --source C:\MyFiles --target D:\Backup --create-schedule
+```
+
+### Example 14: Create Weekly Archive Schedule
+```bash
+BackupSynchronizer --schedule weekly --schedule-name "Weekly Archive" --source C:\Data --archive C:\Backup\weekly.zip --create-schedule
+```
+
+### Example 15: List All Schedules
+```bash
+BackupSynchronizer --list-schedules
+```
+
+### Example 16: Execute Schedule Manually
+```bash
+BackupSynchronizer --schedule-name "Daily Backup" --execute-schedule
+```
+
+### Example 17: Generate Windows Task Scheduler XML
+```bash
+BackupSynchronizer --schedule-name "Daily Backup" --generate-task-scheduler
+```
+
+### Example 18: Generate Cron Expression
+```bash
+BackupSynchronizer --schedule-name "Daily Backup" --generate-cron
+```
+
+### Example 19: Parallel Backup with Custom Threads
+```bash
+BackupSynchronizer --source C:\MyFiles --target D:\Backup --mode simple --max-threads 8
+```
+
+### Example 20: Disable Parallel Operations
+```bash
+BackupSynchronizer --source C:\MyFiles --target D:\Backup --mode simple --disable-parallel
+```
+
+### Example 21: Custom Progress Update Interval
+```bash
+BackupSynchronizer --source C:\MyFiles --target D:\Backup --mode simple --progress-interval 25
+```
+
+### Example 22: Using Configuration File
 ```bash
 # Create config.json with your settings, then run:
 BackupSynchronizer
@@ -236,6 +328,133 @@ The SQLite database tracks:
 - Timestamp of the change
 - File size and reason for the change
 - Physical location of the history file
+
+## Archiving Features
+
+### ZIP Archive Creation
+The tool can create compressed ZIP archives with comprehensive features:
+
+- **Folder Structure Preservation**: Maintains complete directory hierarchy
+- **File Filtering**: Uses same include/exclude patterns as backup/sync operations
+- **Compression Levels**: NoCompression, Fastest, Optimal, SmallestSize
+- **Progress Tracking**: Real-time progress with file counts and compression ratios
+
+### Split Archives
+For large datasets, archives can be split into multiple parts:
+
+- **Size-Based Splitting**: Specify maximum size per part (KB, MB, GB)
+- **Automatic Naming**: Parts named as `archive.part001.zip`, `archive.part002.zip`, etc.
+- **Transparent Handling**: Each part is a complete, valid ZIP archive
+
+### Archive Operations
+- **Create**: `--archive <output>` creates ZIP from source directory
+- **Extract**: `--extract` extracts archive to target directory
+- **List**: `--list-archive` shows all files and folders in archive
+- **Compression**: `--compression-level` controls compression algorithm
+
+### Archive Features
+- **Metadata Preservation**: File timestamps and attributes maintained
+- **Error Handling**: Graceful handling of file access issues
+- **Logging**: Detailed logging of archive operations
+- **Size Reporting**: Original vs compressed size with compression ratios
+
+## Scheduled Operations
+
+### Schedule Types
+The tool supports multiple schedule types for automated operations:
+
+- **Daily**: Execute every day at a specified time (default: 2:00 AM)
+- **Weekly**: Execute on a specific day of the week
+- **Monthly**: Execute on a specific day of the month
+- **Custom**: Use custom cron expressions for advanced scheduling
+
+### Schedule Management
+- **Create Schedules**: Define automated backup, sync, or archive operations
+- **List Schedules**: View all configured schedules with next run times
+- **Execute Schedules**: Run schedules manually for testing
+- **Delete Schedules**: Remove unwanted scheduled operations
+- **Schedule History**: Track execution results and performance
+
+### OS Scheduler Integration
+The tool generates integration files for operating system schedulers:
+
+- **Windows Task Scheduler**: Generate XML files for automatic import
+- **Linux/macOS Cron**: Generate cron expressions for crontab
+- **Cross-Platform**: Works on Windows, Linux, and macOS
+
+### Schedule Features
+- **Timestamped Archives**: Automatic timestamping of archive files
+- **Source Cleanup**: Optional deletion of source files after archiving
+- **Error Handling**: Robust error handling with retry mechanisms
+- **Logging**: Detailed logging of all scheduled operations
+- **Validation**: Comprehensive validation of schedule configurations
+
+### Schedule Configuration
+Schedules are stored in `schedules.json` with the following structure:
+```json
+{
+  "scheduleName": "Daily Backup",
+  "scheduleType": "daily",
+  "sourcePath": "C:\\MyFiles",
+  "archivePath": "C:\\Backup\\daily.zip",
+  "enabled": true,
+  "nextRun": "2025-09-15T02:00:00",
+  "compressionLevel": "Optimal",
+  "includePatterns": [],
+  "excludePatterns": ["*.tmp", "*.log"]
+}
+```
+
+## Parallel File Operations
+
+### Performance Optimization
+The tool now supports parallel file operations to significantly improve backup and sync performance:
+
+- **Multi-threaded Copying**: Uses `Parallel.ForEach` with configurable thread counts
+- **Thread-safe Operations**: All operations are thread-safe with proper locking mechanisms
+- **Progress Tracking**: Real-time progress display with file and byte counts
+- **Configurable Threading**: Adjust thread count based on system capabilities
+- **Fallback Support**: Automatic fallback to sequential operations when needed
+
+### Thread Configuration
+- **Default Threads**: Automatically uses CPU core count for optimal performance
+- **Custom Thread Count**: Override with `--max-threads` parameter
+- **Thread Safety**: All file operations use thread-safe collections and locking
+- **Error Isolation**: File copy failures don't affect other parallel operations
+
+### Progress Display
+```
+Progress: 150/500 files (30.0%) | 45.2/150.8 MB (30.0%)
+```
+
+Features:
+- **File Count Progress**: Shows files copied vs total files
+- **Byte Progress**: Shows data copied vs total data size
+- **Percentage Display**: Both file and byte completion percentages
+- **Configurable Updates**: Set update frequency with `--progress-interval`
+- **Thread-safe Counters**: Progress tracking works correctly with multiple threads
+
+### Performance Benefits
+- **Large File Sets**: Significant speedup for directories with many files
+- **Network Drives**: Improved performance when copying to/from network locations
+- **SSD Optimization**: Better utilization of high-speed storage devices
+- **CPU Utilization**: Makes better use of multi-core processors
+
+### Configuration Options
+```json
+{
+  "MaxThreads": 4,
+  "EnableParallelCopy": true,
+  "ShowProgress": true,
+  "ProgressUpdateInterval": 10
+}
+```
+
+### Best Practices
+- **Thread Count**: Use 2-4 threads for most scenarios, more for SSD-to-SSD copies
+- **Network Copies**: Reduce thread count for network operations to avoid overwhelming
+- **Progress Updates**: Use intervals of 10-50 files depending on operation size
+- **Error Handling**: Monitor logs for any file-specific copy failures
 
 ## Building from Source
 

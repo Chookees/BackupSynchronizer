@@ -13,4 +13,10 @@ public class BackupOptions
     public bool OverwriteExisting { get; set; } = true;
     public bool CreateLogFile { get; set; } = true;
     public string LogFilePath { get; set; } = "backup.log";
+    
+    // Parallel file operations
+    public int MaxThreads { get; set; } = Environment.ProcessorCount;
+    public bool EnableParallelCopy { get; set; } = true;
+    public bool ShowProgress { get; set; } = true;
+    public int ProgressUpdateInterval { get; set; } = 10;
 }

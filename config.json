@@ -28,6 +28,29 @@
   "HistoryDirectory": ".history",
   "AutoCleanup": true,
   "DatabasePath": "file_history.db",
+<<<<<<< Updated upstream
+=======
+  "ArchivePath": "",
+  "SplitSizeBytes": null,
+  "CompressionLevel": "Optimal",
+  "ExtractArchive": false,
+  "ListArchive": false,
+  "ScheduleType": "",
+  "ScheduleName": "",
+  "CronExpression": "",
+  "CreateSchedule": false,
+  "DeleteSchedule": false,
+  "ListSchedules": false,
+  "ExecuteSchedule": false,
+  "GenerateTaskScheduler": false,
+  "GenerateCron": false,
+  "DeleteSourceAfterArchive": false,
+  "CreateTimestampedArchives": true,
+  "MaxThreads": 4,
+  "EnableParallelCopy": true,
+  "ShowProgress": true,
+  "ProgressUpdateInterval": 10,
+>>>>>>> Stashed changes
   "Logging": {
     "LogLevel": {
       "Default": "Information",

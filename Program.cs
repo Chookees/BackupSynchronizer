@@ -102,6 +102,12 @@ class Program
         services.AddSingleton<IFileComparisonService, FileComparisonService>();
         services.AddSingleton<IFileHistoryService, FileHistoryService>();
         services.AddSingleton<IRestoreService, RestoreService>();
+<<<<<<< Updated upstream
+=======
+        services.AddSingleton<IArchiveService, ArchiveService>();
+        services.AddSingleton<IScheduleService, ScheduleService>();
+        services.AddSingleton<IParallelFileService, ParallelFileService>();
+>>>>>>> Stashed changes
         
         // Add Entity Framework
         services.AddDbContext<Data.FileHistoryContext>(options =>
@@ -178,6 +184,81 @@ class Program
                 case "--cleanup-history":
                     options.CleanupHistory = true;
                     break;
+<<<<<<< Updated upstream
+=======
+                case "--archive":
+                    if (i + 1 < args.Length)
+                        options.ArchivePath = args[++i];
+                    break;
+                case "--split-size":
+                    if (i + 1 < args.Length)
+                    {
+                        var sizeStr = args[++i];
+                        if (TryParseSize(sizeStr, out var size))
+                            options.SplitSizeBytes = size;
+                    }
+                    break;
+                case "--compression-level":
+                    if (i + 1 < args.Length)
+                        options.CompressionLevel = args[++i];
+                    break;
+                case "--extract":
+                    options.ExtractArchive = true;
+                    break;
+                case "--list-archive":
+                    options.ListArchive = true;
+                    break;
+                case "--schedule":
+                    if (i + 1 < args.Length)
+                        options.ScheduleType = args[++i];
+                    break;
+                case "--schedule-name":
+                    if (i + 1 < args.Length)
+                        options.ScheduleName = args[++i];
+                    break;
+                case "--create-schedule":
+                    options.CreateSchedule = true;
+                    break;
+                case "--delete-schedule":
+                    options.DeleteSchedule = true;
+                    break;
+                case "--list-schedules":
+                    options.ListSchedules = true;
+                    break;
+                case "--execute-schedule":
+                    options.ExecuteSchedule = true;
+                    break;
+                case "--generate-task-scheduler":
+                    options.GenerateTaskScheduler = true;
+                    break;
+                case "--generate-cron":
+                    options.GenerateCron = true;
+                    break;
+                case "--cron-expression":
+                    if (i + 1 < args.Length)
+                        options.CronExpression = args[++i];
+                    break;
+                case "--delete-source-after-archive":
+                    options.DeleteSourceAfterArchive = true;
+                    break;
+                case "--no-timestamped-archives":
+                    options.CreateTimestampedArchives = false;
+                    break;
+                case "--max-threads":
+                    if (i + 1 < args.Length && int.TryParse(args[++i], out var maxThreads))
+                        options.MaxThreads = maxThreads;
+                    break;
+                case "--disable-parallel":
+                    options.EnableParallelCopy = false;
+                    break;
+                case "--no-progress":
+                    options.ShowProgress = false;
+                    break;
+                case "--progress-interval":
+                    if (i + 1 < args.Length && int.TryParse(args[++i], out var interval))
+                        options.ProgressUpdateInterval = interval;
+                    break;
+>>>>>>> Stashed changes
                 case "--help":
                 case "-h":
                     ShowHelp();
@@ -291,6 +372,35 @@ class Program
         Console.WriteLine("  --history-keep-days <n> Set history retention period (default: 30)");
         Console.WriteLine("  --cleanup-history       Clean up expired history files");
         Console.WriteLine();
+<<<<<<< Updated upstream
+=======
+        Console.WriteLine("Archive Options:");
+        Console.WriteLine("  --archive <output>      Create ZIP archive from source directory");
+        Console.WriteLine("  --split-size <size>     Split archive into parts (e.g., 100MB, 1GB)");
+        Console.WriteLine("  --compression-level <level> Compression level (NoCompression, Fastest, Optimal, SmallestSize)");
+        Console.WriteLine("  --extract               Extract archive to target directory");
+        Console.WriteLine("  --list-archive          List contents of an archive");
+        Console.WriteLine();
+        Console.WriteLine("Schedule Options:");
+        Console.WriteLine("  --schedule <type>       Schedule type (daily, weekly, monthly, custom)");
+        Console.WriteLine("  --schedule-name <name>  Name for the schedule");
+        Console.WriteLine("  --create-schedule       Create a new scheduled operation");
+        Console.WriteLine("  --delete-schedule       Delete an existing schedule");
+        Console.WriteLine("  --list-schedules        List all scheduled operations");
+        Console.WriteLine("  --execute-schedule      Execute a scheduled operation");
+        Console.WriteLine("  --generate-task-scheduler Generate Windows Task Scheduler XML");
+        Console.WriteLine("  --generate-cron         Generate cron expression for Linux/macOS");
+        Console.WriteLine("  --cron-expression <expr> Custom cron expression for advanced scheduling");
+        Console.WriteLine("  --delete-source-after-archive Delete source after successful archive");
+        Console.WriteLine("  --no-timestamped-archives Don't add timestamps to archive names");
+        Console.WriteLine();
+        Console.WriteLine("Parallel Operations:");
+        Console.WriteLine("  --max-threads <n>       Set maximum number of parallel threads (default: CPU count)");
+        Console.WriteLine("  --disable-parallel      Disable parallel file operations");
+        Console.WriteLine("  --no-progress           Disable progress display");
+        Console.WriteLine("  --progress-interval <n> Update progress every N files (default: 10)");
+        Console.WriteLine();
+>>>>>>> Stashed changes
         Console.WriteLine("  -h, --help              Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");
@@ -315,6 +425,48 @@ class Program
         Console.WriteLine("  # Cleanup old history");
         Console.WriteLine("  BackupSynchronizer --cleanup-history --history-keep-days 7");
         Console.WriteLine();
+<<<<<<< Updated upstream
+=======
+        Console.WriteLine("  # Create ZIP archive");
+        Console.WriteLine("  BackupSynchronizer --source C:\\MyFiles --archive C:\\Backup\\archive.zip");
+        Console.WriteLine();
+        Console.WriteLine("  # Create split archive");
+        Console.WriteLine("  BackupSynchronizer --source C:\\LargeFolder --archive backup.zip --split-size 100MB");
+        Console.WriteLine();
+        Console.WriteLine("  # Extract archive");
+        Console.WriteLine("  BackupSynchronizer --source archive.zip --target C:\\Extracted --extract");
+        Console.WriteLine();
+        Console.WriteLine("  # List archive contents");
+        Console.WriteLine("  BackupSynchronizer --source archive.zip --list-archive");
+        Console.WriteLine();
+        Console.WriteLine("  # Create daily schedule");
+        Console.WriteLine("  BackupSynchronizer --schedule daily --schedule-name \"Daily Backup\" --source C:\\MyFiles --target D:\\Backup --create-schedule");
+        Console.WriteLine();
+        Console.WriteLine("  # Create weekly archive schedule");
+        Console.WriteLine("  BackupSynchronizer --schedule weekly --schedule-name \"Weekly Archive\" --source C:\\Data --archive C:\\Backup\\weekly.zip --create-schedule");
+        Console.WriteLine();
+        Console.WriteLine("  # List all schedules");
+        Console.WriteLine("  BackupSynchronizer --list-schedules");
+        Console.WriteLine();
+        Console.WriteLine("  # Execute a schedule manually");
+        Console.WriteLine("  BackupSynchronizer --schedule-name \"Daily Backup\" --execute-schedule");
+        Console.WriteLine();
+        Console.WriteLine("  # Generate Windows Task Scheduler XML");
+        Console.WriteLine("  BackupSynchronizer --schedule-name \"Daily Backup\" --generate-task-scheduler");
+        Console.WriteLine();
+        Console.WriteLine("  # Generate cron expression");
+        Console.WriteLine("  BackupSynchronizer --schedule-name \"Daily Backup\" --generate-cron");
+        Console.WriteLine();
+        Console.WriteLine("  # Parallel backup with 8 threads");
+        Console.WriteLine("  BackupSynchronizer --source C:\\MyFiles --target D:\\Backup --mode simple --max-threads 8");
+        Console.WriteLine();
+        Console.WriteLine("  # Disable parallel operations");
+        Console.WriteLine("  BackupSynchronizer --source C:\\MyFiles --target D:\\Backup --mode simple --disable-parallel");
+        Console.WriteLine();
+        Console.WriteLine("  # Custom progress update interval");
+        Console.WriteLine("  BackupSynchronizer --source C:\\MyFiles --target D:\\Backup --mode simple --progress-interval 25");
+        Console.WriteLine();
+>>>>>>> Stashed changes
         Console.WriteLine("Configuration:");
         Console.WriteLine("  Create a config.json file to set default values.");
         Console.WriteLine("  Command line arguments override config file settings.");

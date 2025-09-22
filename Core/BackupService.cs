@@ -9,17 +9,20 @@ public class BackupService : IBackupService
     private readonly IFileFilterService _fileFilterService;
     private readonly ILoggingService _loggingService;
     private readonly IFileHistoryService _fileHistoryService;
+    private readonly IParallelFileService _parallelFileService;
 
     public BackupService(
         ILogger<BackupService> logger,
         IFileFilterService fileFilterService,
         ILoggingService loggingService,
-        IFileHistoryService fileHistoryService)
+        IFileHistoryService fileHistoryService,
+        IParallelFileService parallelFileService)
     {
         _logger = logger;
         _fileFilterService = fileFilterService;
         _loggingService = loggingService;
         _fileHistoryService = fileHistoryService;
+        _parallelFileService = parallelFileService;
     }
 
     public async Task<BackupResult> RunBackupAsync(BackupOptions options)
@@ -64,8 +67,43 @@ public class BackupService : IBackupService
             _logger.LogInformation("Starting simple backup from {SourcePath} to {TargetPath}", 
                 options.SourcePath, options.TargetPath);
 
-            // Copy files recursively
-            await CopyDirectoryRecursiveAsync(options.SourcePath, options.TargetPath, options, result);
+            // Use parallel file operations if enabled
+            if (options.EnableParallelCopy)
+            {
+                _logger.LogInformation("Using parallel file copy with {MaxThreads} threads", options.MaxThreads);
+                
+                var parallelOptions = new ParallelFileOptions
+                {
+                    MaxDegreeOfParallelism = options.MaxThreads,
+                    ShowProgress = options.ShowProgress,
+                    ProgressUpdateInterval = options.ProgressUpdateInterval,
+                    OverwriteExisting = options.OverwriteExisting,
+                    PreserveTimestamps = true,
+                    PreserveAttributes = true,
+                    IncludePatterns = options.IncludePatterns,
+                    ExcludePatterns = options.ExcludePatterns
+                };
+
+                var parallelResult = await _parallelFileService.CopyFilesParallelAsync(
+                    options.SourcePath, options.TargetPath, parallelOptions);
+
+                // Convert parallel result to backup result
+                result.FilesCopied = parallelResult.FilesCopied;
+                result.FilesSkipped = parallelResult.FilesSkipped;
+                result.Errors = parallelResult.FilesFailed;
+                result.CopiedFiles = parallelResult.CopiedFiles;
+                result.SkippedFiles = parallelResult.SkippedFiles;
+                result.ErrorMessages = parallelResult.Errors;
+
+                _logger.LogInformation("Parallel backup completed. Files copied: {Copied}, skipped: {Skipped}, errors: {Errors}",
+                    result.FilesCopied, result.FilesSkipped, result.Errors);
+            }
+            else
+            {
+                // Fallback to sequential copy
+                _logger.LogInformation("Using sequential file copy");
+                await CopyDirectoryRecursiveAsync(options.SourcePath, options.TargetPath, options, result);
+            }
 
             result.Success = true;
             result.EndTime = DateTime.Now;
