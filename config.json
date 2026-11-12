@@ -28,8 +28,6 @@
   "HistoryDirectory": ".history",
   "AutoCleanup": true,
   "DatabasePath": "file_history.db",
-<<<<<<< Updated upstream
-=======
   "ArchivePath": "",
   "SplitSizeBytes": null,
   "CompressionLevel": "Optimal",
@@ -50,7 +48,6 @@
   "EnableParallelCopy": true,
   "ShowProgress": true,
   "ProgressUpdateInterval": 10,
->>>>>>> Stashed changes
   "Logging": {
     "LogLevel": {
       "Default": "Information",
