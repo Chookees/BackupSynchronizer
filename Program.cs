@@ -119,12 +119,9 @@ class Program
         services.AddSingleton<IFileComparisonService, FileComparisonService>();
         services.AddSingleton<IFileHistoryService, FileHistoryService>();
         services.AddSingleton<IRestoreService, RestoreService>();
-<<<<<<< Updated upstream
-=======
         services.AddSingleton<IArchiveService, ArchiveService>();
         services.AddSingleton<IScheduleService, ScheduleService>();
         services.AddSingleton<IParallelFileService, ParallelFileService>();
->>>>>>> Stashed changes
         
         // Add Entity Framework
         services.AddDbContext<Data.FileHistoryContext>(options =>
@@ -201,8 +198,6 @@ class Program
                 case "--cleanup-history":
                     options.CleanupHistory = true;
                     break;
-<<<<<<< Updated upstream
-=======
                 case "--archive":
                     if (i + 1 < args.Length)
                         options.ArchivePath = args[++i];
@@ -275,7 +270,6 @@ class Program
                     if (i + 1 < args.Length && int.TryParse(args[++i], out var interval))
                         options.ProgressUpdateInterval = interval;
                     break;
->>>>>>> Stashed changes
                 case "--help":
                 case "-h":
                     ShowHelp();
@@ -784,8 +778,6 @@ class Program
         Console.WriteLine("  --history-keep-days <n> Set history retention period (default: 30)");
         Console.WriteLine("  --cleanup-history       Clean up expired history files");
         Console.WriteLine();
-<<<<<<< Updated upstream
-=======
         Console.WriteLine("Archive Options:");
         Console.WriteLine("  --archive <output>      Create ZIP archive from source directory");
         Console.WriteLine("  --split-size <size>     Split archive into parts (e.g., 100MB, 1GB)");
@@ -812,7 +804,6 @@ class Program
         Console.WriteLine("  --no-progress           Disable progress display");
         Console.WriteLine("  --progress-interval <n> Update progress every N files (default: 10)");
         Console.WriteLine();
->>>>>>> Stashed changes
         Console.WriteLine("  -h, --help              Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");
@@ -837,8 +828,6 @@ class Program
         Console.WriteLine("  # Cleanup old history");
         Console.WriteLine("  BackupSynchronizer --cleanup-history --history-keep-days 7");
         Console.WriteLine();
-<<<<<<< Updated upstream
-=======
         Console.WriteLine("  # Create ZIP archive");
         Console.WriteLine("  BackupSynchronizer --source C:\\MyFiles --archive C:\\Backup\\archive.zip");
         Console.WriteLine();
@@ -878,7 +867,6 @@ class Program
         Console.WriteLine("  # Custom progress update interval");
         Console.WriteLine("  BackupSynchronizer --source C:\\MyFiles --target D:\\Backup --mode simple --progress-interval 25");
         Console.WriteLine();
->>>>>>> Stashed changes
         Console.WriteLine("Configuration:");
         Console.WriteLine("  Create a config.json file to set default values.");
         Console.WriteLine("  Command line arguments override config file settings.");
